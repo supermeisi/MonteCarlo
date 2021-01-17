@@ -18,6 +18,16 @@ N = 100 #number of particles
 
 par = [0.473115591, 0.631038719, 0.906404498, 0.012995717, 0.0041280992, 98.7685322]
 
+#mathematical functions
+def dotproduct(v1, v2):
+  return sum((a*b) for a, b in zip(v1, v2))
+
+def length(v):
+  return math.sqrt(dotproduct(v, v))
+
+def angle(v1, v2):
+  return math.acos(dotproduct(v1, v2) / (length(v1) * length(v2)))
+
 #calculating beta value from momentum
 def beta(m, p):
   return p/math.sqrt(pow(m, 2) + pow(p, 2))
@@ -78,14 +88,21 @@ arr_wlen = []
 #simulating particle tracks
 for i in range(N):
   x0, y0, theta0, phi0, mom0 = muongen(0, 0, 10, 10, -3, 3)
+  z0 = 0
 
-  print(x0, y0, theta0, phi0, mom0)
+  #filter out specific undetectable particle angles
+  if theta0 < 5 and theta0 > 22*pi/180:
+    continue
+
+  #print(x0, y0, theta0, phi0, mom0)
 
   arr_x.append(x0)
   arr_y.append(y0)
   arr_theta.append(theta0)
   arr_phi.append(phi0)
   arr_mom.append(mom0)
+
+  n_hits = 0
 
   for j in range(1000):
     wlen = wavelengh(300,800)
@@ -97,7 +114,24 @@ for i in range(N):
     pxc = cos(phi0)*(cos(phic0)*cos(theta0)*sin(thetac0)+sin(theta0)*cos(thetac0))-sin(phi0)*sin(phic0)*sin(thetac0)
     pyc = sin(phi0)*(cos(phic0)*cos(theta0)*sin(thetac0)+sin(theta0)*cos(thetac0))+cos(phi0)*sin(phic0)*sin(thetac0)
     pzc = cos(theta0)*cos(thetac0)-cos(phic0)*sin(theta0)*sin(thetac0)
-    print(pxc, pyc, pzc)
+    #filter out unphysical photon angles
+    theta_photon = angle([pxc,pyc,pzc],[0,0,1])
+    angle_total = math.asin(1/rindex(wlen))
+    if theta_photon < angle_total:
+      continue
+    if pi/2 - theta_photon < 21*pi/180 or pi/2 - theta_photon > 41*pi/180:
+      continue
+    #calculaitng intersection with radiator side
+    l = (250-y0)/pyc
+    if l < 0:
+      continue
+    intx = x0 + l*pxc
+    inty = y0 + l*pyc
+    intz = z0 + l*pzc
+    if intx > -8 and intx < 8:
+      n_hits += 1
+  print("Number of hits: "+str(n_hits))
+    
 
 n_bins = 10
 plt.hist(arr_x, bins=n_bins)
