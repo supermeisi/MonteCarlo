@@ -1,6 +1,8 @@
 import os
 from os import path
+from math import pi
 import math
+from math import sin, cos
 from random import random, uniform, seed
 import matplotlib.pyplot as plt
 
@@ -9,7 +11,8 @@ if not path.exists("figs"):
 
 seed(1)
 
-m_mu = 105.658 #muon mass
+m_mu = 0.1056583755 #muon mass
+p0 = 1
 
 N = 100 #number of particles
 
@@ -21,7 +24,7 @@ def beta(m, p):
 
 #calculating refractive index
 def rindex(l):
-  ll = pow(l/1000.,2)
+  ll = (l/1000.)**2
   rindex = math.sqrt(par[0]/(1.0-(par[3]/ll)) + par[1]/(1.0-(par[4]/ll)) + par[2]/(1.0-(par[5]/ll)) + 1.0)
   return rindex
 
@@ -38,6 +41,15 @@ def franck_tamm(wlen, m, p):
   dndx = 2*math.pi*alpha*pow(z,2)*(1/pow(wlen,2) - 1/(pow(n,2)*pow(beta(m,p),2)*pow(wlen,2)))*1e9
   return dndx
 
+#wavelength distribution
+def wavelengh(wlen_min, wlen_max):
+  while True:
+    wlen = uniform(wlen_min, wlen_max)
+    value = uniform(0,1000)
+    if value < franck_tamm(wlen, m_mu, p0):
+      break
+  return wlen
+
 #muon generator
 def muongen(x0, y0, dx, dy, phi_min, phi_max):
   x0 = x0 - dx/2 + dx*random()
@@ -46,7 +58,7 @@ def muongen(x0, y0, dx, dy, phi_min, phi_max):
   phi = uniform(phi_min,phi_max)
   u = 0
   x = 0
-  while(1):
+  while True:
     x = 500 + 9500*random()
     u = random()*1e-4
     if u < 1/x**2.5:
@@ -61,6 +73,7 @@ arr_phi = []
 arr_mom = []
 
 arr_thetac = []
+arr_wlen = []
 
 #simulating particle tracks
 for i in range(N):
@@ -74,9 +87,17 @@ for i in range(N):
   arr_phi.append(phi0)
   arr_mom.append(mom0)
 
-  thetac0 = thetac(500, m_mu, mom0)
-
-  arr_thetac.append(thetac0)
+  for j in range(1000):
+    wlen = wavelengh(300,800)
+    arr_wlen.append(wlen)
+    thetac0 = thetac(wlen, m_mu, mom0)
+    arr_thetac.append(thetac0)
+    phic0 = 2*pi*random()
+    #direction of Cherenkov photons in lab system
+    pxc = cos(phi0)*(cos(phic0)*cos(theta0)*sin(thetac0)+sin(theta0)*cos(thetac0))-sin(phi0)*sin(phic0)*sin(thetac0)
+    pyc = sin(phi0)*(cos(phic0)*cos(theta0)*sin(thetac0)+sin(theta0)*cos(thetac0))+cos(phi0)*sin(phic0)*sin(thetac0)
+    pzc = cos(theta0)*cos(thetac0)-cos(phic0)*sin(theta0)*sin(thetac0)
+    print(pxc, pyc, pzc)
 
 n_bins = 10
 plt.hist(arr_x, bins=n_bins)
@@ -96,4 +117,7 @@ plt.savefig("figs/mom.pdf")
 plt.close()
 plt.hist(arr_thetac, bins=n_bins)
 plt.savefig("figs/thetac.pdf")
+plt.close()
+plt.hist(arr_wlen, bins=n_bins)
+plt.savefig("figs/wlen.pdf")
 plt.close()
