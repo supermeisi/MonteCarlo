@@ -7,6 +7,7 @@ import math
 from math import sin, cos, sqrt, asin, acos, tan, atan, radians
 from random import random, uniform, seed, gauss
 import matplotlib.pyplot as plt
+import matplotlib.mlab as mlab
 from scipy.stats import norm
 import numpy as np
 import threading
@@ -17,12 +18,13 @@ if not path.exists("figs"):
 
 seed(1)
 
-multithread = False
+multithread = True
 
-m_mu = 0.1056583755 #muon mass
+m_mu = 0.1056583755
+m_pi = 0.13957039
 p0 = 1
 
-N = 1 #number of particles
+N = 100 #number of particles
 
 n_threads = 1 #number of threads
 
@@ -32,7 +34,9 @@ sx = 0
 sy = 0
 stheta = 0
 sphi = 0
-R = 0.8
+R = 800
+d = 16
+r = 2000
 
 n_roms = 288
 
@@ -108,14 +112,13 @@ arr_wlen = []
 arr_phi_prime = []
 arr_thetac_reco = []
 
-def simulation():
+def simulation(m = m_mu, mom0 = 1):
   #simulating particle tracks
   for i in range(int(N/n_threads)):
     theta0 = radians(5)
     phi0 = radians(0)
-    x0 = sin(theta0)*cos(phi0)
-    y0 = sin(theta0)*sin(phi0)
-    mom0 = 1
+    x0 = r*sin(theta0)*cos(phi0)
+    y0 = r*sin(theta0)*sin(phi0)
     
     arr_x.append(x0)
     arr_y.append(y0)
@@ -124,19 +127,22 @@ def simulation():
 
     p2 = [cos(phi0),sin(phi0)]
 
-    nphotons, error = integrate.quad(lambda x: franck_tamm(x,m_mu,mom0), wlen_min, wlen_max)
+    nphotons, error = integrate.quad(lambda x: franck_tamm(x,m,mom0), wlen_min, wlen_max)
     
     n_hits = 0
 
     for j in range(n_roms):
-      wlen = wavelengh(wlen_min, wlen_max, m_mu, mom0)
-      thetac0 = thetac(wlen, m_mu, mom0)
+      #simulation part
+      wlen = wavelengh(wlen_min, wlen_max, m, mom0)
+      thetac0 = thetac(wlen, m, mom0)
       arr_thetac.append(thetac0)
       angle_fel = radians(360)/n_roms*j
       fel_x = R*cos(angle_fel)
       fel_y = R*sin(angle_fel)
       dx = fel_x - x0
       dy = fel_y - y0
+      dx = dx - 8 + 16*random()
+      dy = dy - 8 + 16*random()
       dr = [dx, dy]
       phirel = angle(p2,dr)
       norm = [cos(angle_fel),sin(angle_fel)]
@@ -152,18 +158,19 @@ def simulation():
       if theta_photon < angle_total:
         continue
       arr_phi_prime.append(phi_prime)
+      n_hits += 1
+      #reconstruction part
       dx = fel_x - gauss(x0,sx)
       dy = fel_y - gauss(y0,sy)
       dr = [dx,dy]
       phirel = angle(p2,dr)
       alpha = angle(norm,dr)
-      phi = atan(tan(phi)*cos(alpha))
+      phi = atan(tan(phi_prime)*cos(alpha))
       theta0 = gauss(theta0,stheta)
       phirel = angle(p2,dr)
       thetac0 = acos(sin(theta0)*cos(phirel)*cos(phi)+cos(theta0)*sin(phi))
       print(thetac0)
       arr_thetac_reco.append(thetac0)
-      n_hits += 1
 
   print(n_hits)
 
@@ -181,7 +188,7 @@ if multithread:
 else:
   simulation()
 
-n_bins = int(sqrt(N))
+n_bins = 10
 plt.hist(arr_x, bins=n_bins)
 plt.xlabel('x [mm]')
 plt.ylabel('Entries')
@@ -230,7 +237,7 @@ plt.ylabel('Entries')
 plt.savefig("figs/phi_prime.pdf")
 plt.savefig("figs/phi_prime.png")
 plt.close()
-plt.hist(arr_thetac_reco, bins=n_bins)
+n, bins, patches = plt.hist(arr_thetac_reco, bins=n_bins,density=1)
 mu, std = norm.fit(arr_thetac_reco)
 xmin, xmax = plt.xlim()
 x = np.linspace(xmin, xmax, 100)
